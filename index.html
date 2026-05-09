@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>TrekWorks Hub</title>
+<meta name="color-scheme" content="dark light" />
+<style>
+  :root{
+    --bg:#0f1115; --panel:#151822; --panel-2:#101320; --text:#eaeef7; --muted:#9aa3b2;
+    --accent:#4fb2ff; --accent-2:#6fdd9c; --divider:#1e2230;
+    --card:#161a25; --card-hover:#1b2030;
+    --pill:#0f1320; --pill-indicator:#243048;
+    --radius:16px;
+  }
+  html,body{height:100%}
+  body{
+    margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text);
+  }
+
+  .wrap{max-width:1100px; margin:0 auto; padding:28px 16px 64px}
+  header{display:flex; align-items:center; justify-content:center; margin-bottom:18px}
+  header h1{font-weight:700; font-size:clamp(22px,3.2vw,36px); margin:0; letter-spacing:.2px}
+  header .globe{font-size:28px; margin-right:10px}
+
+  .seg{
+    position:relative; display:inline-grid; grid-auto-flow:column; gap:0;
+    background:var(--pill); border:1px solid var(--divider);
+    border-radius:999px; padding:6px; margin:8px auto 22px; user-select:none;
+  }
+  .seg button{
+    position:relative; z-index:1; appearance:none; border:0; background:transparent;
+    color:var(--muted); padding:10px 18px; border-radius:999px; font-weight:600; cursor:pointer;
+    font-size:14px; letter-spacing:.2px;
+  }
+  .seg button[aria-pressed="true"]{color:var(--text)}
+  .seg .indicator{
+    position:absolute; top:6px; left:6px; height:calc(100% - 12px);
+    width:calc(50% - 6px); border-radius:999px; background:var(--pill-indicator);
+    transition:transform .28s cubic-bezier(.22,.61,.36,1);
+  }
+  .seg[data-mode="timeline"] .indicator{ transform:translateX(100%) }
+
+  .section{margin:26px 0 8px}
+  .section h2{
+    font-size:18px; font-weight:700; margin:0 0 10px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .section .muted{color:var(--muted); font-weight:600}
+
+  .grid{
+    display:grid; gap:14px;
+    grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+  }
+
+  .card{
+    background:var(--card); border:1px solid var(--divider); border-radius:var(--radius);
+    padding:16px 15px; transition:transform .12s ease, background .12s ease, border-color .12s ease;
+    text-decoration:none; color:inherit; display:flex; flex-direction:column; gap:6px;
+  }
+  .card:hover{ transform:translateY(-2px); background:var(--card-hover); border-color:#26304a }
+  .card .title{font-weight:700; font-size:16px; line-height:1.3}
+  .meta{display:flex; gap:10px; align-items:center; color:var(--muted); font-size:13px}
+  .pill{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted);
+        background:var(--panel-2); padding:6px 10px; border-radius:999px; border:1px solid var(--divider)}
+  .flag{font-size:16px}
+
+  .divider{height:1px; background:var(--divider); margin:22px 0}
+  .sr-only{position:absolute!important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
+
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important; animation:none!important}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="globe">🌏</div>
+      <h1>TrekWorks Hub</h1>
+    </header>
+
+    <div class="seg" role="tablist" aria-label="View mode" data-mode="countries">
+      <div class="indicator" aria-hidden="true"></div>
+      <button id="tab-countries" role="tab" aria-selected="true" aria-pressed="true" tabindex="0">Countries</button>
+      <button id="tab-timeline" role="tab" aria-selected="false" aria-pressed="false" tabindex="-1">Timeline</button>
+    </div>
+
+    <main id="content" aria-live="polite"></main>
+  </div>
+
+<script>
+/* ===========================================================
+   TRIP DATA — FULL EXPLICIT URLS (NO trips.json dependency)
+   =========================================================== */
+
+const TRIPS = [
+  { id:"GJN-2024-Sep", title:"GJN-2024 (Japan)", country:"Japan", flag:"🇯🇵", start:"2024-08-31", end:"2024-09-10", path:"https://jp-gjn-2024-sep.trekworks.org/" },
+  { id:"SP-2025-Sep", title:"SP-2025 (Japan)", country:"Japan", flag:"🇯🇵", start:"2025-08-30", end:"2025-09-07", path:"https://jp-sp-2025-sep.trekworks.org/" },
+  { id:"GJN-2026-May", title:"GJN-2026 (Japan)", country:"Japan", flag:"🇯🇵", start:"2026-05-14", end:"2026-05-29", path:"https://jp-gjn-2026-may.trekworks.org/" },
+  { id:"GJN-2024-Jul", title:"GJN-2024 (Thailand)", country:"Thailand", flag:"🇹🇭", start:"2024-07-03", end:"2024-07-09", path:"https://th-gjn-2024-jul.trekworks.org/" },
+  { id:"GJN-2025-May", title:"GJN-2025 (Thailand)", country:"Thailand", flag:"🇹🇭", start:"2025-05-19", end:"2025-05-28", path:"https://th-gjn-2025-may.trekworks.org/" },
+  { id:"GJN-2025-Sep", title:"GJN-2025 (South Korea)", country:"South Korea", flag:"🇰🇷", start:"2025-09-08", end:"2025-09-18", path:"https://kr-gjn-2025-sep.trekworks.org/" },
+  { id:"GJN-2027-May", title:"GJN-2027 (South Korea)", country:"South Korea", flag:"🇰🇷", start:"2027-05-01", end:"2027-05-10", path:"https://kr-gjn-2027-may.trekworks.org/" },
+  { id:"GJN-2026-Aug", title:"GJN-2026 (Fiji)", country:"Fiji", flag:"🇫🇯", start:"2026-08-01", end:"2026-08-10", path:"https://fj-gjn-2026-aug.trekworks.org/" }
+];
+
+/* ============ RENDERING ENGINE (unchanged) ============ */
+function sortCountryTrips(a,b){ const c=a.id.localeCompare(b.id); return c||new Date(a.start)-new Date(b.start); }
+function byDateAsc(a,b){ return new Date(a.start)-new Date(b.start); }
+function groupBy(arr,key){ return arr.reduce((a,i)=>(a[i[key]]??=[]).push(i)&&a,{}); }
+function el(t,c,h){ const n=document.createElement(t); if(c)n.className=c; if(h!=null)n.innerHTML=h; return n; }
+
+function renderCountries(trips){
+  const root=document.createDocumentFragment();
+  const groups=groupBy(trips,'country');
+  ['Japan','Thailand','South Korea','Fiji'].forEach(country=>{
+    if(!groups[country]) return;
+    const s=el('section','section');
+    s.appendChild(el('h2',null,`<span class="flag">${groups[country][0].flag}</span> ${country}`));
+    const g=el('div','grid');
+    groups[country].sort(sortCountryTrips).forEach(t=>g.appendChild(card(t)));
+    s.appendChild(g); root.appendChild(s); root.appendChild(el('div','divider'));
+  });
+  return root;
+}
+
+function renderTimeline(trips){
+  const s=el('section','section');
+  s.appendChild(el('h2',null,'📅 Timeline <span class="muted">(all trips)</span>'));
+  const g=el('div','grid');
+  trips.slice().sort(byDateAsc).forEach(t=>g.appendChild(card(t,true)));
+  s.appendChild(g); return s;
+}
+
+function fmtRange(t){
+  try{
+    const o={day:'2-digit',month:'short',year:'numeric'};
+    return `${new Date(t.start).toLocaleDateString(undefined,o)} → ${new Date(t.end).toLocaleDateString(undefined,o)}`;
+  }catch{return''}
+}
+
+function card(t,show=false){
+  const a=el('a','card'); a.href=t.path;
+  a.append(el('div','title',t.title));
+  const m=el('div','meta',fmtRange(t));
+  if(show)m.appendChild(el('span','pill',`<span class="flag">${t.flag}</span>${t.country}`));
+  a.appendChild(m); return a;
+}
+
+(function init(){
+  const c=document.getElementById('content');
+  c.replaceChildren(renderCountries(TRIPS));
+  document.getElementById('tab-countries').onclick=()=>c.replaceChildren(renderCountries(TRIPS));
+  document.getElementById('tab-timeline').onclick=()=>c.replaceChildren(renderTimeline(TRIPS));
+})();
+</script>
+
+<!-- ✅ Trip Hub Service Worker registration -->
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch(() => {
+        // Portal still works online if service worker registration is unavailable.
+      });
+    });
+  }
+</script>
+
+</body>
+</html>
